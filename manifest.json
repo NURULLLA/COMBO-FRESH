@@ -1,0 +1,18 @@
+{
+    "name": "COMBO Fresh",
+    "short_name": "COMBO Fresh",
+    "description": "Aircraft Cargo Weight & Balance Optimization Tool — ATL loadsheet edition",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#080f1f",
+    "theme_color": "#080f1f",
+    "icons": [
+        {
+            "src": "icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
+}
