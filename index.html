@@ -142,7 +142,7 @@
                 <div class="flex items-center gap-2">
                     <h1 class="text-2xl font-black text-white leading-tight">COMBO FRESH</h1>
                     <span
-                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.1</span>
+                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.2</span>
                 </div>
                 <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">DOW & Live Trim • <span
                         class="text-green-500">Active</span></div>
@@ -469,9 +469,13 @@
                             <tr class="bg-slate-700/20">
                                 <td class="px-4 py-3">
                                     <div class="font-medium">Total Load</div>
-                                    <div class="flex gap-2 text-[10px] mt-1">
+                                    <div class="flex flex-wrap gap-2 text-[10px] mt-1">
                                         <span class="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/20">Main: <span id="val-main-idx" class="font-bold">0.0</span></span>
                                         <span class="bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">Lower: <span id="val-lower-idx" class="font-bold">0.0</span></span>
+                                        <span class="bg-slate-800/60 text-slate-400 px-1.5 py-0.5 rounded border border-slate-600/30">C1 <span id="val-cpt1-idx" class="font-bold font-mono">—</span></span>
+                                        <span class="bg-slate-800/60 text-slate-400 px-1.5 py-0.5 rounded border border-slate-600/30">C2 <span id="val-cpt2-idx" class="font-bold font-mono">—</span></span>
+                                        <span class="bg-slate-800/60 text-slate-400 px-1.5 py-0.5 rounded border border-slate-600/30">C3 <span id="val-cpt3-idx" class="font-bold font-mono">—</span></span>
+                                        <span class="bg-slate-800/60 text-slate-400 px-1.5 py-0.5 rounded border border-slate-600/30">C4 <span id="val-cpt4-idx" class="font-bold font-mono">—</span></span>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-right font-mono text-yellow-400 font-bold text-lg" id="val-load-wt">0.0</td>
@@ -1760,10 +1764,18 @@
             }
 
             let totalLowerWt = 0; let totalLowerIdx = 0;
-            ['cpt1', 'cpt2', 'cpt3', 'cpt4'].forEach(function (key) {
+            ['cpt1', 'cpt2', 'cpt3', 'cpt4'].forEach(function (key, ci) {
                 const w = state.lowerDeck[key] || 0;
+                const ix = getLowerDeckIndex(key, w);
                 totalLowerWt += w;
-                totalLowerIdx += getLowerDeckIndex(key, w);
+                totalLowerIdx += ix;
+                // Per-compartment index chip in the Loadsheet Summary
+                const chip = document.getElementById('val-cpt' + (ci + 1) + '-idx');
+                if (chip) {
+                    chip.textContent = w > 0 ? (ix > 0 ? '+' : '') + ix : '—';
+                    chip.className = 'font-bold font-mono ' +
+                        (w <= 0 ? 'text-slate-500' : ix < 0 ? 'text-sky-400' : ix > 0 ? 'text-amber-400' : 'text-slate-300');
+                }
             });
 
             const loadWt = totalMainWt + totalLowerWt;
