@@ -142,7 +142,7 @@
                 <div class="flex items-center gap-2">
                     <h1 class="text-2xl font-black text-white leading-tight">COMBO FRESH</h1>
                     <span
-                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.0</span>
+                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.1</span>
                 </div>
                 <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">DOW & Live Trim • <span
                         class="text-green-500">Active</span></div>
@@ -586,7 +586,7 @@
     <!-- JAVASCRIPT -->
     <script>
         // Service Worker Registration
-        if ('serviceWorker' in navigator) {
+        if (navigator.serviceWorker) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
                     .then(reg => console.log('Service Worker registered'))
@@ -1833,6 +1833,11 @@
             updateValRaw('val-ldg-allowed', ldgAllowed);
             updateValRaw('val-atl', atl);
             updateValRaw('val-underload', underload);
+            const ulEl = document.getElementById('val-underload');
+            if (ulEl) {
+                ulEl.classList.toggle('text-red-500', underload < 0);
+                ulEl.classList.toggle('animate-pulse', underload < 0);
+            }
             const atlLimitEl = document.getElementById('val-atl-limit');
             if (atlLimitEl) atlLimitEl.textContent = binding.label;
 
@@ -1881,10 +1886,11 @@
                 }
             }
         }
-        // Whole-kg display without a forced ".0" — used for the ATL/tare weight chain
+        // Whole-kg display without a forced ".0" — used for the ATL/tare weight chain.
+        // Round half away from zero so negatives don't drift up (-123.45 -> -123.5).
         function updateValRaw(id, val) {
             const el = document.getElementById(id);
-            if (el) el.textContent = String(Math.round(val * 10) / 10);
+            if (el) el.textContent = String(Math.sign(val) * Math.round(Math.abs(val) * 10) / 10);
         }
         function interpolateFuelIndex(w) { if (w <= 0) return 0; if (w < FUEL_TABLE[0].w) return FUEL_TABLE[0].i; for (let k = 0; k < FUEL_TABLE.length - 1; k++) { if (w >= FUEL_TABLE[k].w && w <= FUEL_TABLE[k + 1].w) { const r = (w - FUEL_TABLE[k].w) / (FUEL_TABLE[k + 1].w - FUEL_TABLE[k].w); return FUEL_TABLE[k].i + r * (FUEL_TABLE[k + 1].i - FUEL_TABLE[k].i); } } return FUEL_TABLE[FUEL_TABLE.length - 1].i; }
         function getLowerDeckIndex(cpt, w) { const t = LOWER_DECK_TABLE[cpt]; if (!t) return 0; for (let e of t) { if (w <= e.max) return e.val; } return t[t.length - 1].val; }
