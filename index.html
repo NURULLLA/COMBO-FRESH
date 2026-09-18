@@ -142,7 +142,7 @@
                 <div class="flex items-center gap-2">
                     <h1 class="text-2xl font-black text-white leading-tight">COMBO FRESH</h1>
                     <span
-                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.2</span>
+                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.3</span>
                 </div>
                 <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">DOW & Live Trim • <span
                         class="text-green-500">Active</span></div>
@@ -775,11 +775,19 @@
                 saveState();
             });
 
-            document.getElementById('applyFuelBtn').addEventListener('click', () => {
+            // Fuel inputs recalculate live as you type; Apply Fuel stays as an
+            // explicit confirmation for the loadmaster's flow.
+            const applyFuelInputs = () => {
                 state.fob = parseFloat(document.getElementById('fob-input').value) || 0;
                 state.trip = parseFloat(document.getElementById('trip-input').value) || 0;
                 calculate();
                 saveState();
+            };
+            document.getElementById('fob-input').addEventListener('input', applyFuelInputs);
+            document.getElementById('trip-input').addEventListener('input', applyFuelInputs);
+
+            document.getElementById('applyFuelBtn').addEventListener('click', () => {
+                applyFuelInputs();
                 const status = document.getElementById('fuelStatus');
                 status.textContent = '✓ Fuel applied';
                 status.classList.add('text-emerald-400');
