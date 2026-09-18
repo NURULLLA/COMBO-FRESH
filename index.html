@@ -142,7 +142,7 @@
                 <div class="flex items-center gap-2">
                     <h1 class="text-2xl font-black text-white leading-tight">COMBO FRESH</h1>
                     <span
-                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.3</span>
+                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.4</span>
                 </div>
                 <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">DOW & Live Trim • <span
                         class="text-green-500">Active</span></div>
@@ -694,13 +694,37 @@
         }
 
         function init() {
-            // Global Error Boundary for Mobile Stability
+            // Global Error Boundary for Mobile Stability.
+            // Errors also surface as a red on-screen badge so field users can
+            // screenshot the cause instead of a silently dead button.
+            const showErrorBadge = function (text) {
+                try {
+                    let b = document.getElementById('js-error-badge');
+                    if (!b) {
+                        b = document.createElement('div');
+                        b.id = 'js-error-badge';
+                        b.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:#7f1d1d;color:#fff;font-size:11px;font-family:monospace;padding:6px 30px 6px 10px;border-radius:8px;opacity:.96;box-shadow:0 4px 12px rgba(0,0,0,.5)';
+                        const x = document.createElement('span');
+                        x.textContent = '✕';
+                        x.style.cssText = 'position:absolute;right:10px;top:6px;cursor:pointer;font-weight:bold';
+                        x.onclick = function () { b.remove(); };
+                        b.appendChild(x);
+                        const t = document.createElement('div');
+                        t.id = 'js-error-badge-text';
+                        b.insertBefore(t, x);
+                        document.body.appendChild(b);
+                    }
+                    document.getElementById('js-error-badge-text').textContent = '⚠ ' + text;
+                } catch (e) { /* never let the badge itself throw */ }
+            };
             window.onerror = function (msg, url, line) {
                 console.error("Global Error: " + msg + " at " + line);
+                showErrorBadge('JS error: ' + msg + ' (line ' + line + ')');
                 return false;
             };
             window.onunhandledrejection = function (event) {
                 console.error("Unhandled Promise Rejection: " + event.reason);
+                showErrorBadge('Promise rejection: ' + event.reason);
             };
 
             // AC Selection

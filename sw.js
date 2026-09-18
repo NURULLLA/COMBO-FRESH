@@ -1,4 +1,4 @@
-const CACHE_NAME = 'combo-fresh-v4';
+const CACHE_NAME = 'combo-fresh-v5';
 
 const ASSETS = [
     './',
