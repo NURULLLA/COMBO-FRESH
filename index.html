@@ -142,7 +142,7 @@
                 <div class="flex items-center gap-2">
                     <h1 class="text-2xl font-black text-white leading-tight">COMBO FRESH</h1>
                     <span
-                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.4</span>
+                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.5</span>
                 </div>
                 <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">DOW & Live Trim • <span
                         class="text-green-500">Active</span></div>
@@ -266,6 +266,7 @@
                     <span>⛽</span> Apply Fuel
                 </button>
                 <div id="fuelStatus" class="text-[10px] text-center text-slate-500 mt-1 h-3"></div>
+                <div id="fuel-warning" class="hidden text-[10px] text-center text-red-400 font-bold mt-1">⚠ Trip Fuel exceeds Takeoff Fuel — Remaining Fuel clamped to 0</div>
             </div>
         </div>
 
@@ -1836,6 +1837,17 @@
 
             // 4. Landing
             const remFuel = Math.max(0, toFuel - trip); // guard against negative remaining fuel
+
+            // Impossible fuel plan: burning more than is on board. Show it,
+            // don't just clamp silently — this reads as "app is broken".
+            const tripImpossible = trip > toFuel && toFuel > 0;
+            const fuelWarnEl = document.getElementById('fuel-warning');
+            if (fuelWarnEl) fuelWarnEl.classList.toggle('hidden', !tripImpossible);
+            const tripInputEl = document.getElementById('trip-input');
+            if (tripInputEl) {
+                tripInputEl.classList.toggle('ring-1', tripImpossible);
+                tripInputEl.classList.toggle('ring-red-500', tripImpossible);
+            }
             const remFuelIdx = interpolateFuelIndex(remFuel);
             const lw = zfw + remFuel;
             const lwIdx = zfwIdx + remFuelIdx;
