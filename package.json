@@ -1,7 +1,7 @@
 {
     "name": "combo-fresh",
     "private": true,
-    "version": "2.0.5",
+    "version": "2.0.6",
     "description": "COMBO Fresh — aircraft cargo weight & balance PWA (offline-capable)",
     "scripts": {
         "test": "node smoke-test.cjs"

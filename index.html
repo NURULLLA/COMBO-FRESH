@@ -142,7 +142,7 @@
                 <div class="flex items-center gap-2">
                     <h1 class="text-2xl font-black text-white leading-tight">COMBO FRESH</h1>
                     <span
-                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.5</span>
+                        class="bg-blue-600/30 text-blue-400 text-[8px] px-1.5 py-0.5 rounded border border-blue-500/20 font-black">v2.0.6</span>
                 </div>
                 <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">DOW & Live Trim • <span
                         class="text-green-500">Active</span></div>
@@ -1187,7 +1187,7 @@
             const superHeavy = items.filter(w => w > standardLimit).sort((a, b) => a - b);
             const normal     = items.filter(w => w <= standardLimit).sort((a, b) => a - b);
 
-            if (superHeavy.length > highLimitPos.length) return null;
+            if (superHeavy.length > highLimitPos.length) return computeAscendingMainForced(items, count, uldType, highLimitPos);
 
             // Reserve the LAST N high-limit positions for super-heavy pallets
             // so they sit as far toward the tail as the limits allow.
@@ -1209,7 +1209,7 @@
                        w > getMainDeckLimit(uldType, normalPositions[posIdx])) {
                     posIdx++;
                 }
-                if (posIdx >= normalPositions.length) return null;
+                if (posIdx >= normalPositions.length) return computeAscendingMainForced(items, count, uldType, highLimitPos);
                 result[normalPositions[posIdx]] = w;
                 posIdx++;
             }
@@ -1221,6 +1221,47 @@
             }
 
             return result;
+        }
+
+        // Fallback when the weights cannot be placed within the position limits
+        // (e.g. more super-heavy pallets than high-limit positions). Still places
+        // every item — the heaviest go to the high-limit positions, the rest
+        // ascending front→tail — and the over-limit positions are flagged in the UI.
+        function computeAscendingMainForced(items, count, uldType, highLimitPos) {
+            const result = new Array(count).fill(0);
+            const desc = [...items].sort((a, b) => b - a);
+            const nHigh = Math.min(highLimitPos.length, desc.length);
+            const heaviest = desc.slice(0, nHigh).sort((a, b) => a - b);
+            const rest = desc.slice(nHigh).sort((a, b) => a - b);
+
+            const reserved = highLimitPos.slice(highLimitPos.length - nHigh);
+            reserved.forEach((pos, k) => { result[pos] = heaviest[k]; });
+
+            const reservedSet = new Set(reserved);
+            const freePos = [];
+            for (let i = 0; i < count; i++) if (!reservedSet.has(i)) freePos.push(i);
+
+            // Place lighter items from the nose, heavier toward the tail; skip a
+            // low-limit position only while there are still enough positions left.
+            let p = 0;
+            rest.forEach((w, k) => {
+                const remaining = rest.length - k;
+                while (p < freePos.length - remaining &&
+                       w > getMainDeckLimit(uldType, freePos[p])) p++;
+                result[freePos[p]] = w;
+                p++;
+            });
+            return result;
+        }
+
+        // Main deck positions whose weight exceeds the position limit.
+        function getMainDeckViolations(main, uldType) {
+            const out = [];
+            main.forEach((w, i) => {
+                const limit = getMainDeckLimit(uldType, i);
+                if (w > limit) out.push({ pos: i, w, limit, over: w - limit });
+            });
+            return out;
         }
 
         window.sortMainDeck = function() {
@@ -1333,12 +1374,8 @@
                         }
                     });
 
-                    const globalMax = Math.max(4652, 4264);
-                    if (mainItems.some(w => w > globalMax)) {
-                        document.getElementById('optStatus').textContent = "⚠ One or more Main Deck items exceeds max weight limit!";
-                        document.getElementById('optStatus').className = 'text-xs text-red-400 h-4 font-mono font-bold tracking-tight';
-                        return;
-                    }
+                    // Over-limit main deck weights no longer abort the allocation:
+                    // everything is placed and the violations are flagged afterwards.
 
                     // In ascending mode, the main deck is fixed up-front (light at nose, heavy at tail).
                     // In index20 mode, the main deck is shuffled together with the lower deck below.
@@ -1346,11 +1383,6 @@
                     let mainIdxContrib = 0;
                     if (mode === 'ascending') {
                         ascendingMain = computeAscendingMain(mainItems, count, state.uldType);
-                        if (!ascendingMain) {
-                            document.getElementById('optStatus').textContent = "⚠ Too many super-heavy items for available high-limit positions!";
-                            document.getElementById('optStatus').className = 'text-xs text-red-400 h-4 font-mono font-bold tracking-tight';
-                            return;
-                        }
                         // Main deck contribution is now fixed — only optimise lower deck
                         ascendingMain.forEach((w, pos) => { mainIdxContrib += w * (coeffs[pos] || 0); });
                     }
@@ -1358,10 +1390,12 @@
                     let bestState = null;
                     let bestDiff = Infinity;
                     let bestSpreadScore = Infinity;
+                    let bestOverKg = Infinity;
 
                     for (let i = 0; i < 10000; i++) {
                         let shuffledMain = ascendingMain;
                         let curMainIdxContrib = mainIdxContrib;
+                        let overKg = 0;
 
                         if (mode === 'index20') {
                             // Assign items to a random subset of the available positions
@@ -1369,13 +1403,14 @@
                             const posOrder = Array.from({ length: count }, (_, idx) => idx).sort(() => Math.random() - 0.5);
                             const itemOrder = [...mainItems].sort(() => Math.random() - 0.5);
                             shuffledMain = new Array(count).fill(0);
-                            let validMain = true;
+                            // Over-limit placements are allowed but penalised: the search
+                            // first minimises total kg over the position limits.
                             for (let k = 0; k < itemOrder.length; k++) {
                                 const pos = posOrder[k];
-                                if (itemOrder[k] > getMainDeckLimit(state.uldType, pos)) { validMain = false; break; }
+                                overKg += Math.max(0, itemOrder[k] - getMainDeckLimit(state.uldType, pos));
                                 shuffledMain[pos] = itemOrder[k];
                             }
-                            if (!validMain) continue;
+                            if (overKg > bestOverKg + 0.5) continue;
                             curMainIdxContrib = 0;
                             shuffledMain.forEach((w, pos) => { curMainIdxContrib += w * (coeffs[pos] || 0); });
                         }
@@ -1440,6 +1475,8 @@
 
                             let isBetter = false;
                             if (bestState === null) isBetter = true;
+                            else if (overKg < bestOverKg - 0.5) isBetter = true;
+                            else if (overKg > bestOverKg + 0.5) isBetter = false;
                             else {
                                 const diffImp = bestDiff - diff;
                                 if (diffImp > 0.1) isBetter = true;
@@ -1447,6 +1484,7 @@
                             }
 
                             if (isBetter) {
+                                bestOverKg = overKg;
                                 bestDiff = diff;
                                 bestSpreadScore = maxUtil;
                                 bestState = { main: shuffledMain, buckets: buckets, bucketLists: bucketLists };
@@ -1462,7 +1500,17 @@
 
                     // Apply
                     if (bestState) {
-                        document.getElementById('optStatus').textContent = "Success! Index Deviation: " + bestDiff.toFixed(2);
+                        const viol = getMainDeckViolations(bestState.main, state.uldType);
+                        const statusEl = document.getElementById('optStatus');
+                        if (viol.length) {
+                            statusEl.textContent = "⚠ Allocated with " + viol.length + " over-limit position(s): " +
+                                viol.map(v => 'P' + (v.pos + 1) + ' +' + Math.round(v.over) + 'kg').join(', ') +
+                                " · Index Dev " + bestDiff.toFixed(2);
+                            statusEl.className = 'text-xs text-red-400 min-h-4 font-mono font-bold tracking-tight';
+                        } else {
+                            statusEl.textContent = "Success! Index Deviation: " + bestDiff.toFixed(2);
+                            statusEl.className = 'text-xs text-yellow-400 h-4 font-mono font-bold tracking-tight';
+                        }
                         document.getElementById('resultsSection').classList.remove('hidden');
 
                         // Render Main Plan
@@ -1521,9 +1569,9 @@
                 const IUcol = w > 0 ? (w * (coeffs[i] || 0)).toFixed(2) : '0.00';
 
                 const cargoBox = hasCargo
-                    ? `<div class="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/50 text-white rounded-lg p-2 cursor-grab active:cursor-grabbing flex items-center justify-between gap-3 min-w-[100px] transition-all transform active:scale-95" draggable="true" ondragstart="handleMainDragStart(event, ${i})">
+                    ? `<div class="${w > limit ? 'bg-red-600 hover:bg-red-500 shadow-red-900/50 ring-2 ring-red-400' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/50'} shadow-lg text-white rounded-lg p-2 cursor-grab active:cursor-grabbing flex items-center justify-between gap-3 min-w-[100px] transition-all transform active:scale-95" draggable="true" ondragstart="handleMainDragStart(event, ${i})">
                             <div class="flex flex-col leading-none">
-                                <span class="text-[10px] font-bold opacity-75">CARGO</span>
+                                <span class="text-[10px] font-bold opacity-75">${w > limit ? '⚠ OVER +' + Math.round(w - limit) : 'CARGO'}</span>
                                 <span class="text-sm font-bold font-mono">${w} <span class="text-[10px]">kg</span></span>
                             </div>
                             <span class="text-xl opacity-60">::</span>
@@ -1540,7 +1588,7 @@
                 tr.innerHTML = `
                         <td class="px-4 py-3 align-middle">
                             <div class="font-bold text-blue-400 text-base">Position ${i + 1}</div>
-                            <div class="text-[10px] text-slate-500 font-mono">Max ${limit} kg</div>
+                            <div class="text-[10px] ${w > limit ? 'text-red-400 font-bold' : 'text-slate-500'} font-mono">Max ${limit} kg</div>
                         </td>
                         <td class="px-4 py-3 text-right align-middle">
                             <div class="flex items-center justify-end gap-2 w-full">
@@ -1662,6 +1710,16 @@
                 // Update Index Impact Cell
                 const idxDiv = document.getElementById(`idx-pos-${posIndex}`);
                 if (idxDiv) idxDiv.textContent = (val * (coeffs[posIndex] || 0)).toFixed(2);
+
+                // Flag over-limit weight live (allowed, but highlighted)
+                const over = val > getMainDeckLimit(state.uldType, posIndex);
+                const inp = row.querySelector('input');
+                if (inp) {
+                    inp.classList.toggle('border-red-500', over);
+                    inp.classList.toggle('text-red-400', over);
+                    inp.classList.toggle('border-slate-600', !over);
+                    inp.classList.toggle('text-white', !over);
+                }
             }
             saveState();
         };
